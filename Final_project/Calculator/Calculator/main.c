@@ -31,6 +31,7 @@ void Set_PWM (void)
 xTaskHandle  Task_plw_id;
 xTaskHandle  Task_plp_id;
 xTaskHandle  Task_pb_id;
+xTaskHandle  Task_calc_id;
 xSemaphoreHandle xSemaphore;
 
 int direction;
@@ -57,8 +58,9 @@ void period_blinking(void *p);
 //******************************************************
 
 //Keypad functions
-uint8_t GetKeyPressed(void);
+unsigned char GetKeyPressed(void);
 unsigned char KeyPad_AdjustKeyNumber(unsigned char button_number);
+void Calculator (void *p);
 //********************************************************************
 
 int main(void)
@@ -144,9 +146,9 @@ void LedFalling(void)
 	}
 }
 
-uint8_t GetKeyPressed(void)
+unsigned char GetKeyPressed(void)
 {
-	 uint8_t r,c;
+	 unsigned char r,c;
 	KEYPAD_PORT|= 0X0F;
 	
 	for(c=0;c<4;c++)
@@ -159,10 +161,7 @@ uint8_t GetKeyPressed(void)
 			 {	
 				if(xSemaphoreTake(xSemaphore,portMAX_DELAY)==pdTRUE)
 				{
-					uint8_t x= KeyPad_AdjustKeyNumber((r*4)+c+1);
-					lcd_disp_string_xy(x,0,0);
-					return KeyPad_AdjustKeyNumber((r*4)+c+1);
-					
+					return KeyPad_AdjustKeyNumber((r*4)+c+1);					
 				}		 				
 			 }
 		}
@@ -248,9 +247,13 @@ void period_lcd_press(void *p)
 			vTaskDelayUntil( &xLastWakeTime, xPeriod_on );
 			lcd_clrScreen();
 			vTaskDelayUntil( &xLastWakeTime, xPeriod_off );
-			xSemaphoreGive(xSemaphore);
-			GetKeyPressed();
-			xSemaphoreTake(xSemaphore,time);
+			if (GetKeyPressed() != NULL)
+			{
+				xSemaphoreGive(xSemaphore);
+				vTaskDelete(NULL);
+				xTaskCreate(Calculator,  NULL, 100, NULL,1, &Task_calc_id );
+			}
+
 			
 		}
 	}
@@ -281,5 +284,15 @@ void period_blinking(void *p)
 	}
 	xSemaphoreGive(xSemaphore);
 	vTaskDelete(NULL);	
-
 }
+
+void Calculator(void *p)
+{
+	if(xSemaphoreTake(xSemaphore,portMAX_DELAY)==pdTRUE)
+	{
+		unsigned char x= GetKeyPressed();
+		lcd_gotoxy(0,0);
+		lcd_displayChar(x);
+	}
+}
+
